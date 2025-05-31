@@ -21,3 +21,5 @@ build/
 # OS-specific files
 .DS_Store
 Thumbs.db
+last_repo.txt
+data
