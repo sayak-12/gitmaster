@@ -11,7 +11,7 @@ from gitmaster.rag.agent import answer_question, summarize_repo
 import shutil
 
 app = typer.Typer(help="gitmaster - AI for your code repos")
-
+repo_path = None
 
 @app.command()
 def load(
@@ -20,7 +20,9 @@ def load(
     clear_index: bool = typer.Option(False, "--clear-index", "-c", help="Clear existing vector index before indexing")
 ):
     """Load a GitHub or local repo into vector DB."""
+    global repo_path
     try:
+        typer.echo("🔄 Loading repo...")
         if type == "repo":
             repo_path = repo_loader.clone_repo(path_or_url)
         elif type == "local":
@@ -193,5 +195,74 @@ def clear():
         typer.echo(f"✅ Cleanup complete: {deleted_repos} repo(s) and {deleted_stores} vector store(s) removed.")
     except Exception as e:
         typer.echo(f"❌ Error during cleanup: {e.__class__.__name__}: {str(e)}")
+@app.command()
+def explain(file_path: str):
+    """Explain a file in the loaded repository."""
+    global repo_path
+    typer.echo(f"🔍 Explaining repo: {repo_path}")
+    # Try to get repo_path from global or last_repo.txt
+    if not repo_path:
+        try:
+            with open("last_repo.txt", "r") as f:
+                repo_path_local = f.read().strip()
+                repo_path = repo_path_local
+                typer.echo(f"Using repo from last load: {repo_path}")
+        except FileNotFoundError:
+            typer.echo("❌ No repo loaded yet. Use `gitmaster load` first.")
+            return
+    if not repo_path:
+        typer.echo("❌ No repo loaded yet. Use `gitmaster load` first.")
+        return
+    # Remove leading slashes to avoid absolute path issues
+    file_path = file_path.lstrip("/\\")
+    abs_file_path = os.path.join(repo_path, file_path)
+    if not os.path.isfile(abs_file_path):
+        typer.echo(f"❌ File not found: {abs_file_path}")
+        return
+    try:
+        with open(abs_file_path, "r", encoding="utf-8") as f:
+            file_content = f.read()
+    except Exception as e:
+        typer.echo(f"❌ Could not read file: {e}")
+        return
+    from gitmaster.rag.agent import get_explanation
+    typer.echo(f"📝 Explaining {file_path}...")
+    typer.echo(f"📂 File content:\n{file_content[:500]}...")
+    explanation = get_explanation(file_content, file_path)
+    typer.echo("\n🤖 Explanation:\n" + explanation)
+@app.command()
+def suggest(file_path: str):
+    """Suggest improvements for a file in the loaded repository."""
+    global repo_path
+    typer.echo(f"🔍 Suggesting for repo: {repo_path}")
+    # Try to get repo_path from global or last_repo.txt
+    if not repo_path:
+        try:
+            with open("last_repo.txt", "r") as f:
+                repo_path_local = f.read().strip()
+                repo_path = repo_path_local
+                typer.echo(f"Using repo from last load: {repo_path}")
+        except FileNotFoundError:
+            typer.echo("❌ No repo loaded yet. Use `gitmaster load` first.")
+            return
+    if not repo_path:
+        typer.echo("❌ No repo loaded yet. Use `gitmaster load` first.")
+        return
+    # Remove leading slashes to avoid absolute path issues
+    file_path = file_path.lstrip("/\\")
+    abs_file_path = os.path.join(repo_path, file_path)
+    if not os.path.isfile(abs_file_path):
+        typer.echo(f"❌ File not found: {abs_file_path}")
+        return
+    try:
+        with open(abs_file_path, "r", encoding="utf-8") as f:
+            file_content = f.read()
+    except Exception as e:
+        typer.echo(f"❌ Could not read file: {e}")
+        return
+    from gitmaster.rag.agent import get_suggestions
+    typer.echo(f"📝 Suggesting improvements for {file_path}...")
+    suggestions = get_suggestions(file_content, file_path)
+    typer.echo("\n💡 Suggestions:\n" + suggestions)
 if __name__ == "__main__":
     app()
