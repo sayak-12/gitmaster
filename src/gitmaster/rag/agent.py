@@ -4,7 +4,7 @@ from gitmaster.embed.embedder import embed_with_local_model
 from gitmaster.db.vector_store import VectorStore
 from gitmaster.utils.network import is_online
 from gitmaster.auth.keymanager import get_openai_key
-
+from datetime import time 
 try:
     from openai import OpenAI
 except ImportError:
@@ -159,3 +159,81 @@ def summarize_repo(repo_identifier: str, repo_path: str) -> str:
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"❌ OpenAI error: {str(e)}"
+
+def get_explanation(file_content: str, file_path: str) -> str:
+    """
+    Get an LLM-based explanation for the given file content.
+    Retries up to 3 times if a 500 Internal Server Error occurs.
+    Output is formatted as plain text (no markdown decorations).
+    """
+    import traceback
+    api_key = get_openai_key()
+    if not api_key or not is_online():
+        return "⚠️ Offline or no OpenAI key. Cannot provide explanation."
+    if OpenAI is None:
+        return "❌ OpenAI SDK not installed. Run `pip install openai`."
+    system_prompt = "You are a code assistant. Explain the following code file in clear, concise language for a developer."
+    user_prompt = f"Explain the file `{file_path}`.\n\nCode:\n\n{file_content}"
+    client = OpenAI(api_key=api_key)
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            answer = response.choices[0].message.content.strip()
+            # Remove markdown decorations from the output
+            answer = answer.replace('**', '').replace('```', '')
+            return answer
+        except Exception as e:
+            err_str = str(e)
+            if ("500" in err_str or "Internal Server Error" in err_str) and attempt < max_retries:
+                import time; time.sleep(2)
+                continue
+            if "500" in err_str or "Internal Server Error" in err_str:
+                return "❌ OpenAI server error (500). Please try again later."
+            traceback.print_exc()
+            return f"❌ OpenAI error: {err_str}"
+
+def get_suggestions(file_content: str, file_path: str) -> str:
+    """
+    Get LLM-based suggestions for improving the given file in terms of readability, performance, and structure.
+    Retries up to 3 times if a 500 Internal Server Error occurs.
+    Output is formatted as plain text (no markdown decorations).
+    """
+    import traceback
+    api_key = get_openai_key()
+    if not api_key or not is_online():
+        return "⚠️ Offline or no OpenAI key. Cannot provide suggestions."
+    if OpenAI is None:
+        return "❌ OpenAI SDK not installed. Run `pip install openai`."
+    system_prompt = "You are a code review assistant. Suggest improvements to the following code file in terms of readability, performance, and structure."
+    user_prompt = f"Suggest improvements for the file `{file_path}`.\n\nCode:\n\n{file_content}"
+    client = OpenAI(api_key=api_key)
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            answer = response.choices[0].message.content.strip()
+            # Remove markdown decorations from the output
+            answer = answer.replace('**', '').replace('```', '')
+            return answer
+        except Exception as e:
+            err_str = str(e)
+            if ("500" in err_str or "Internal Server Error" in err_str) and attempt < max_retries:
+                import time; time.sleep(2)
+                continue
+            if "500" in err_str or "Internal Server Error" in err_str:
+                return "❌ OpenAI server error (500). Please try again later."
+            traceback.print_exc()
+            return f"❌ OpenAI error: {err_str}"
