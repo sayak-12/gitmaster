@@ -106,7 +106,10 @@ gitmaster --help
 
 This project is licensed under the MIT License.
 
-## Author
+## Authors
 
-Sayak Raha  
-Email: sayakraha12@gmail.com
+Sayak Raha  @sayak-12
+sayakraha12@gmail.com
+
+Senjuti Saha @shuamamine
+sahasenjuti796@gmail.com
