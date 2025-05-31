@@ -1,0 +1,23 @@
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Packaging
+*.egg-info/
+dist/
+build/
+
+# IDE/Editor settings (optional but common)
+.vscode/
+.idea/
+
+# Environment/config files
+.env
+
+# OS-specific files
+.DS_Store
+Thumbs.db

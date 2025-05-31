@@ -1,0 +1,34 @@
+[project]
+name = "gitmaster"
+version = "0.1.1"
+description = "CLI tool to ask questions about GitHub or local repos using RAG + LLM"
+authors = [{ name = "Sayak Raha", email = "sayakraha12@gmail.com" }]
+readme = "readme.md"
+requires-python = ">=3.8"
+
+dependencies = [
+    "typer[all]",
+  "faiss-cpu",
+  "openai",
+  "tqdm",
+  "gitpython",
+  "openai",
+  "requests",
+  "keyring",
+  "python-dotenv",
+  "sentence-transformers",
+  "faiss-cpu"
+]
+
+[project.scripts]
+gitmaster = "gitmaster.cli:app"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

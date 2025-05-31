@@ -1,0 +1,9 @@
+typer[all]
+gitpython
+openai
+requests
+keyring
+tqdm
+python-dotenv
+sentence-transformers
+faiss-cpu
