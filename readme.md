@@ -140,7 +140,11 @@ gitmaster --help
 
 ## Changelog
 
-### Version 0.1.3 (Latest)
+### Version 0.1.4 (Latest)
+- **🐛 Bug Fixes:**
+  - Improved error handling for deleting API keys: no traceback if a key does not exist, and graceful handling in `logout` and `change-key` commands.
+
+### Version 0.1.3
 - **✨ New Features:**
   - Added support for multiple LLM providers (Google Gemini, Anthropic Claude)
   - Implemented `--version` / `-v` command to display current version
