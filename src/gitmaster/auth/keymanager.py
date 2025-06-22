@@ -1,4 +1,5 @@
 import keyring
+from keyring.errors import PasswordDeleteError
 
 SERVICE_NAME = "gitmaster"
 OPENAI_KEY_NAME = "openai_api_key"
@@ -14,7 +15,11 @@ def get_openai_key() -> str | None:
     return keyring.get_password(SERVICE_NAME, OPENAI_KEY_NAME)
 
 def delete_openai_key():
-    keyring.delete_password(SERVICE_NAME, OPENAI_KEY_NAME)
+    try:
+        keyring.delete_password(SERVICE_NAME, OPENAI_KEY_NAME)
+    except PasswordDeleteError:
+        # Password doesn't exist, which is fine
+        pass
     _update_default_if_deleted("openai")
 
 def save_gemini_key(key: str):
@@ -25,7 +30,11 @@ def get_gemini_key() -> str | None:
     return keyring.get_password(SERVICE_NAME, GEMINI_KEY_NAME)
 
 def delete_gemini_key():
-    keyring.delete_password(SERVICE_NAME, GEMINI_KEY_NAME)
+    try:
+        keyring.delete_password(SERVICE_NAME, GEMINI_KEY_NAME)
+    except PasswordDeleteError:
+        # Password doesn't exist, which is fine
+        pass
     _update_default_if_deleted("gemini")
 
 def save_anthropic_key(key: str):
@@ -36,7 +45,11 @@ def get_anthropic_key() -> str | None:
     return keyring.get_password(SERVICE_NAME, ANTHROPIC_KEY_NAME)
 
 def delete_anthropic_key():
-    keyring.delete_password(SERVICE_NAME, ANTHROPIC_KEY_NAME)
+    try:
+        keyring.delete_password(SERVICE_NAME, ANTHROPIC_KEY_NAME)
+    except PasswordDeleteError:
+        # Password doesn't exist, which is fine
+        pass
     _update_default_if_deleted("anthropic")
 
 def get_all_keys() -> dict:
@@ -49,14 +62,40 @@ def get_all_keys() -> dict:
 
 def delete_all_keys():
     """Delete all stored API keys."""
+    deleted_count = 0
+    errors = []
+    
     try:
         delete_openai_key()
-        delete_gemini_key()
-        delete_anthropic_key()
+        deleted_count += 1
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"Error deleting keys: {e}")
+        errors.append(f"OpenAI: {str(e)}")
+    
+    try:
+        delete_gemini_key()
+        deleted_count += 1
+    except Exception as e:
+        errors.append(f"Gemini: {str(e)}")
+    
+    try:
+        delete_anthropic_key()
+        deleted_count += 1
+    except Exception as e:
+        errors.append(f"Anthropic: {str(e)}")
+    
+    # Also try to delete the default key setting
+    try:
+        keyring.delete_password(SERVICE_NAME, DEFAULT_KEY_NAME)
+    except PasswordDeleteError:
+        # Default key doesn't exist, which is fine
+        pass
+    except Exception as e:
+        errors.append(f"Default key: {str(e)}")
+    
+    if errors:
+        print(f"⚠️ Some keys could not be deleted: {', '.join(errors)}")
+    
+    return deleted_count
 
 def get_default_key() -> str | None:
     """Get the currently set default API key."""
@@ -113,4 +152,8 @@ def _update_default_if_deleted(deleted_service: str):
             keyring.set_password(SERVICE_NAME, DEFAULT_KEY_NAME, available_keys[0])
         else:
             # No keys left, remove default
-            keyring.delete_password(SERVICE_NAME, DEFAULT_KEY_NAME)
+            try:
+                keyring.delete_password(SERVICE_NAME, DEFAULT_KEY_NAME)
+            except PasswordDeleteError:
+                # Default key doesn't exist, which is fine
+                pass

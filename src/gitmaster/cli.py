@@ -7,7 +7,7 @@ from gitmaster.loader import repo_loader
 from gitmaster.embed.splitter import chunk_repo
 from gitmaster.embed.embedder import embed_with_local_model
 from gitmaster.db.vector_store import VectorStore
-from gitmaster.rag.agent import answer_question, summarize_repo
+from gitmaster.rag.agent import answer_question, summarize_repo, get_explanation, get_suggestions
 import shutil
 import importlib.metadata
 
@@ -138,9 +138,12 @@ def logout():
     """Logout of GitHub and clear API key."""
     try:
         typer.echo("🔒 Logging out...")
-        keymanager.delete_all_keys()
+        deleted_count = keymanager.delete_all_keys()
         github.logout()
-        typer.echo("✅ All credentials cleared.")
+        if deleted_count > 0:
+            typer.echo(f"✅ {deleted_count} API key(s) and GitHub credentials cleared.")
+        else:
+            typer.echo("✅ GitHub credentials cleared. (No API keys were found to delete)")
     except Exception as e:
         typer.echo(f"❌ Error logging out: {e.__class__.__name__}")
 
@@ -208,8 +211,11 @@ def change_key():
         elif choice == 6:
             confirm = typer.confirm("⚠️ Are you sure you want to delete all API keys?")
             if confirm:
-                keymanager.delete_all_keys()
-                typer.echo("✅ All API keys deleted.")
+                deleted_count = keymanager.delete_all_keys()
+                if deleted_count > 0:
+                    typer.echo(f"✅ {deleted_count} API key(s) deleted.")
+                else:
+                    typer.echo("✅ No API keys were found to delete.")
             else:
                 typer.echo("❌ Operation cancelled.")
         else:
@@ -308,7 +314,6 @@ def explain(file_path: str):
     except Exception as e:
         typer.echo(f"❌ Could not read file: {e}")
         return
-    from gitmaster.rag.agent import get_explanation
     typer.echo(f"📝 Explaining {file_path}...")
     typer.echo(f"📂 File content:\n{file_content[:500]}...")
     explanation = get_explanation(file_content, file_path)
