@@ -9,9 +9,28 @@ from gitmaster.embed.embedder import embed_with_local_model
 from gitmaster.db.vector_store import VectorStore
 from gitmaster.rag.agent import answer_question, summarize_repo
 import shutil
+import importlib.metadata
+
+# Get version from package metadata
+try:
+    __version__ = importlib.metadata.version("gitmaster")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "unknown"
+
+def version_callback(value: bool):
+    if value:
+        typer.echo(f"gitmaster version {__version__}")
+        raise typer.Exit()
 
 app = typer.Typer(help="gitmaster - AI for your code repos")
 repo_path = None
+
+@app.callback()
+def main(
+    version: bool = typer.Option(None, "--version", "-v", callback=version_callback, is_eager=True, help="Show version and exit")
+):
+    """gitmaster - AI for your code repos"""
+    pass
 
 @app.command()
 def load(
@@ -103,6 +122,7 @@ def ask(question: str):
     typer.echo(f"💬 Asking: {question}")
     answer = answer_question(question, repo_id, repo_path)
     typer.echo("\n🧠 Answer:\n" + answer)
+
 @app.command()
 def login():
     """Login to GitHub (for private repo access)."""
@@ -118,23 +138,85 @@ def logout():
     """Logout of GitHub and clear API key."""
     try:
         typer.echo("🔒 Logging out...")
-        keymanager.delete_openai_key()
+        keymanager.delete_all_keys()
         github.logout()
         typer.echo("✅ All credentials cleared.")
     except Exception as e:
         typer.echo(f"❌ Error logging out: {e.__class__.__name__}")
 
-
 @app.command("change-key")
 def change_key():
-    """Set or update your OpenAI API key."""
+    """Set or update your API keys for different AI services."""
     try:
-        key = typer.prompt("🔑 Enter your OpenAI API key", hide_input=True)
-        keymanager.save_openai_key(key)
-        typer.echo("✅ API key saved securely.")
+        typer.echo("🔑 API Key Management")
+        typer.echo("Choose which API key to set:")
+        typer.echo("1. OpenAI API Key")
+        typer.echo("2. Gemini API Key")
+        typer.echo("3. Anthropic API Key")
+        typer.echo("4. View current keys")
+        typer.echo("5. Set default key")
+        typer.echo("6. Delete all keys")
+        
+        choice = typer.prompt("Enter your choice (1-6)", type=int)
+        
+        if choice == 1:
+            key = typer.prompt("🔑 Enter your OpenAI API key", hide_input=True)
+            keymanager.save_openai_key(key)
+            typer.echo("✅ OpenAI API key saved securely.")
+        elif choice == 2:
+            key = typer.prompt("🔑 Enter your Gemini API key", hide_input=True)
+            keymanager.save_gemini_key(key)
+            typer.echo("✅ Gemini API key saved securely.")
+        elif choice == 3:
+            key = typer.prompt("🔑 Enter your Anthropic API key", hide_input=True)
+            keymanager.save_anthropic_key(key)
+            typer.echo("✅ Anthropic API key saved securely.")
+        elif choice == 4:
+            keys = keymanager.get_all_keys()
+            default_service = keymanager.get_default_service()
+            typer.echo("\n📋 Current API Keys:")
+            for service, key in keys.items():
+                status = "✅ Set" if key else "❌ Not set"
+                default_indicator = " (Default)" if service == default_service else ""
+                typer.echo(f"  {service.title()}: {status}{default_indicator}")
+        elif choice == 5:
+            keys = keymanager.get_all_keys()
+            available_keys = [service for service, key in keys.items() if key]
+            
+            if not available_keys:
+                typer.echo("❌ No API keys found. Please add at least one key first.")
+                return
+            
+            if len(available_keys) == 1:
+                typer.echo(f"ℹ️ Only one key available ({available_keys[0]}), it's already the default.")
+                return
+            
+            typer.echo("Choose which key to set as default:")
+            for i, service in enumerate(available_keys, 1):
+                typer.echo(f"{i}. {service.title()}")
+            
+            try:
+                key_choice = typer.prompt(f"Enter your choice (1-{len(available_keys)})", type=int)
+                if 1 <= key_choice <= len(available_keys):
+                    selected_service = available_keys[key_choice - 1]
+                    keymanager.set_default_key(selected_service)
+                    typer.echo(f"✅ {selected_service.title()} set as default key.")
+                else:
+                    typer.echo("❌ Invalid choice.")
+            except ValueError:
+                typer.echo("❌ Invalid input. Please enter a number.")
+        elif choice == 6:
+            confirm = typer.confirm("⚠️ Are you sure you want to delete all API keys?")
+            if confirm:
+                keymanager.delete_all_keys()
+                typer.echo("✅ All API keys deleted.")
+            else:
+                typer.echo("❌ Operation cancelled.")
+        else:
+            typer.echo("❌ Invalid choice. Please select 1-6.")
+            
     except Exception as e:
-        typer.echo(f"❌ Error saving API key: {e.__class__.__name__}")
-
+        typer.echo(f"❌ Error managing API keys: {e.__class__.__name__}")
 
 @app.command()
 def summarize():
@@ -195,6 +277,7 @@ def clear():
         typer.echo(f"✅ Cleanup complete: {deleted_repos} repo(s) and {deleted_stores} vector store(s) removed.")
     except Exception as e:
         typer.echo(f"❌ Error during cleanup: {e.__class__.__name__}: {str(e)}")
+
 @app.command()
 def explain(file_path: str):
     """Explain a file in the loaded repository."""
@@ -230,6 +313,7 @@ def explain(file_path: str):
     typer.echo(f"📂 File content:\n{file_content[:500]}...")
     explanation = get_explanation(file_content, file_path)
     typer.echo("\n🤖 Explanation:\n" + explanation)
+
 @app.command()
 def suggest(file_path: str):
     """Suggest improvements for a file in the loaded repository."""
@@ -264,5 +348,79 @@ def suggest(file_path: str):
     typer.echo(f"📝 Suggesting improvements for {file_path}...")
     suggestions = get_suggestions(file_content, file_path)
     typer.echo("\n💡 Suggestions:\n" + suggestions)
+
+@app.command()
+def review_pr(pr_url: str):
+    """Review a GitHub Pull Request and provide analysis using LLM."""
+    try:
+        typer.echo("🔍 Analyzing Pull Request...")
+        
+        # Parse PR URL and extract data
+        from gitmaster.pr_reviewer import PRReviewer
+        reviewer = PRReviewer()
+        
+        # Get PR data
+        pr_data = reviewer.get_pr_data(pr_url)
+        if not pr_data:
+            typer.echo("❌ Could not fetch PR data. Check URL and permissions.")
+            return
+            
+        # Show PR overview
+        typer.echo(f"\n📋 PR: {pr_data['title']}")
+        typer.echo(f"👤 Author: {pr_data['author']}")
+        typer.echo(f"📅 Created: {pr_data['created_at']}")
+        typer.echo(f"📁 Files changed: {len(pr_data['files'])}")
+        typer.echo(f"➕ Additions: {pr_data['additions']}")
+        typer.echo(f"➖ Deletions: {pr_data['deletions']}")
+        
+        # Show changed files
+        typer.echo(f"\n📄 Changed Files:")
+        for i, file_info in enumerate(pr_data['files'], 1):
+            status = file_info['status']
+            additions = file_info.get('additions', 0)
+            deletions = file_info.get('deletions', 0)
+            typer.echo(f"  {i}. {file_info['filename']} ({status})")
+            if status != 'removed':
+                typer.echo(f"     +{additions} -{deletions} lines")
+        
+        # Ask user if they want to analyze all files or select specific ones
+        if len(pr_data['files']) > 10:
+            typer.echo(f"\n⚠️ Large PR detected ({len(pr_data['files'])} files).")
+            choice = typer.prompt(
+                "Choose analysis mode",
+                type=typer.Choice(['all', 'select'], case_sensitive=False),
+                default='select'
+            )
+        else:
+            choice = 'all'
+        
+        if choice == 'select':
+            typer.echo("\nSelect files to analyze (comma-separated numbers, or 'all'):")
+            selection = typer.prompt("File numbers")
+            
+            if selection.lower() == 'all':
+                selected_files = pr_data['files']
+            else:
+                try:
+                    indices = [int(x.strip()) - 1 for x in selection.split(',')]
+                    selected_files = [pr_data['files'][i] for i in indices if 0 <= i < len(pr_data['files'])]
+                except (ValueError, IndexError):
+                    typer.echo("❌ Invalid selection. Analyzing all files.")
+                    selected_files = pr_data['files']
+        else:
+            selected_files = pr_data['files']
+        
+        # Analyze the PR
+        typer.echo(f"\n🧠 Analyzing {len(selected_files)} files...")
+        analysis = reviewer.analyze_pr(pr_data, selected_files)
+        
+        typer.echo("\n" + "="*50)
+        typer.echo("📊 PR ANALYSIS")
+        typer.echo("="*50)
+        typer.echo(analysis)
+        
+    except Exception as e:
+        typer.echo(f"❌ Error reviewing PR: {e.__class__.__name__}: {str(e)}")
+
 if __name__ == "__main__":
     app()

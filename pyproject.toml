@@ -1,6 +1,6 @@
 [project]
 name = "gitmaster"
-version = "0.1.2"
+version = "0.1.3"
 description = "CLI tool to ask questions about GitHub or local repos using RAG + LLM"
 authors = [{ name = "Sayak Raha", email = "sayakraha12@gmail.com" }]
 readme = "readme.md"
